@@ -49,10 +49,10 @@ $connection = socket_connect($sock, $path);
 }
 
 function closeMpdSocket($sock) {
-sendMpdCommand($sock,"close");
-socket_close($sock);
-// debug
-runelog("[0][".$sock."]\t<<<<<< CLOSE MPD SOCKET >>>>>>\t\t\t",'');
+	sendMpdCommand($sock,"close");
+	socket_close($sock);
+	// debug
+	runelog("[0][".$sock."]\t<<<<<< CLOSE MPD SOCKET >>>>>>\t\t\t",'');
 }
 
 
@@ -65,119 +65,124 @@ function sendMpdCommand($sock,$cmd) {
 		$cmd = $cmd."\n";
 		socket_write($sock, $cmd, strlen($cmd));		
 	}
-runelog("MPD COMMAND: (socket=".$sock.")",$cmd);
-//ui_notify('COMMAND GIVEN','CMD = '.$cmd,'','.9');
+	runelog("MPD COMMAND: (socket=".$sock.")",$cmd);
+	//ui_notify('COMMAND GIVEN','CMD = '.$cmd,'','.9');
 }
 
 function readMpdResponse($sock) {
-$output = "";
-while($resp = socket_read($sock, 32768)) {
-   $output .= $resp;
-   if ((strpos($output, "OK\n") !== false) OR (strpos($output, "ACK") !== false)) break;
-}
-// runelog("socket_read: buffer length ".strlen($output),$output);
-return str_replace(MPD_GREETING,'',$output);
-// return $output;
+	$output = "";
+	while($resp = socket_read($sock, 32768)) {
+	   $output .= $resp;
+	   if ((strpos($output, "OK\n") !== false) OR (strpos($output, "ACK") !== false)) break;
+	}
+	// runelog("socket_read: buffer length ".strlen($output),$output);
+	return str_replace(MPD_GREETING,'',$output);
+	// return $output;
 }
 
 function sendMpdIdle($sock) {
-//sendMpdCommand($sock,"idle player,playlist"); 
-sendMpdCommand($sock,"idle"); 
-$response = readMpdResponse($sock);
-$response = array_map('trim',explode(":",$response));
-return $response;
+	//sendMpdCommand($sock,"idle player,playlist"); 
+	sendMpdCommand($sock,"idle"); 
+	$response = readMpdResponse($sock);
+	$response = array_map('trim',explode(":",$response));
+	return $response;
 }
 
 function monitorMpdState($sock) {
 	if ($change = sendMpdIdle($sock)) {
-	$status = _parseStatusResponse(MpdStatus($sock));
-	$status['changed'] = substr($change[1], 0, -3);
-	// runelog('monitorMpdState()', $status);
-	return $status;
+		$status = _parseStatusResponse(MpdStatus($sock));
+		$status['changed'] = substr($change[1], 0, -3);
+		// runelog('monitorMpdState()', $status);
+		return $status;
 	}
 }
 
 function getTrackInfo($sock,$songID) {
-			// set currentsong, currentartis, currentalbum
-			sendMpdCommand($sock,"playlistinfo ".$songID);
-			$track = readMpdResponse($sock);
-			// runelog('+++++++++++++ getTrackInfo data +++++++++++++++', $track);
-			return _parseFileListResponse($track);
+	// set currentsong, currentartis, currentalbum
+	sendMpdCommand($sock,"playlistinfo ".$songID);
+	$track = readMpdResponse($sock);
+	// runelog('+++++++++++++ getTrackInfo data +++++++++++++++', $track);
+	return _parseFileListResponse($track);
 }
 
 function getPlayQueue($sock) {
-sendMpdCommand($sock,"playlistinfo");
-$playqueue = readMpdResponse($sock);
-//return _parseFileListResponse($playqueue);
-return $playqueue; 
+	sendMpdCommand($sock,"playlistinfo");
+	$playqueue = readMpdResponse($sock);
+	//return _parseFileListResponse($playqueue);
+	return $playqueue; 
 }
 
 function getTemplate($template) {
-return str_replace("\"","\\\"",implode("",file($template)));
+	return str_replace("\"","\\\"",implode("",file($template)));
 }
 
 function getMpdOutputs($mpd) {
-sendMpdCommand($mpd,"outputs");
-$outputs= readMpdResponse($mpd);
-return $outputs;
+	sendMpdCommand($mpd,"outputs");
+	$outputs= readMpdResponse($mpd);
+	return $outputs;
 }
 
 function getLastFMauth($redis) {
-$lastfmauth = $redis->hGetAll('lastfm');
-return $lastfmauth;
+	$lastfmauth = $redis->hGetAll('lastfm');
+	return $lastfmauth;
 }
 
 function setLastFMauth($redis,$lastfm) {
-$redis->hSet('lastfm','user',$lastfm->user);
-$redis->hSet('lastfm','pass',$lastfm->pass);
+	$redis->hSet('lastfm','user',$lastfm->user);
+	$redis->hSet('lastfm','pass',$lastfm->pass);
 }
 
 function echoTemplate($template) {
-echo $template;
+	echo $template;
 }
 
 function saveBookmark($redis,$path) {
 	$idx = $redis->incr('bookmarksidx');
 	$name = parseFileStr($path,'/');
 	$return = $redis->hSet('bookmarks',$idx,json_encode(array('name' => $name, 'path' => $path)));
-return $return;
+	return $return;
 }
 
 function deleteBookmark($redis,$id) {
 	$return = $redis->hDel('bookmarks',$id);
-return $return;
+	return $return;
+}
+
+function browseDB($sock,$browsemode,$query) {
+	switch ($browsemode) {
+		case 'file':
+			if (isset($query) && !empty($query)){
+			sendMpdCommand($sock,'lsinfo "'.html_entity_decode($query).'"');
+			break;
+			} else {
+			sendMpdCommand($sock,'lsinfo');
+			break;
+			}
+		case 'album':
+			sendMpdCommand($sock,'list "album"');
+		case 'artist':
+			sendMpdCommand($sock,'list "artist"');
+		case 'genre':
+			sendMpdCommand($sock,'list "genre"');
+		case 'globalrandom':
+			sendMpdCommand($sock,'listall');
+		break;
+	}
+	$response = readMpdResponse($sock);
+	return _parseFileListResponse($response);
 }
 
 function searchDB($sock,$querytype,$query) {
-	switch ($querytype) {
-	case "filepath":
-		if (isset($query) && !empty($query)){
-		sendMpdCommand($sock,"lsinfo \"".html_entity_decode($query)."\"");
-		break;
-		} else {
-		sendMpdCommand($sock,"lsinfo");
-		break;
-		}
-	case "album":
-	case "artist":
-	case "title":
-	case "file":
-		sendMpdCommand($sock,"search ".$querytype." \"".html_entity_decode($query)."\"");
-	break;
-	case "globalrandom":
-		sendMpdCommand($sock,"listall");
-	break;
-	}
-	
-$response = readMpdResponse($sock);
-return _parseFileListResponse($response);
+	sendMpdCommand($sock,"search ".$querytype." \"".html_entity_decode($query)."\"");
+	$response = readMpdResponse($sock);
+	return _parseFileListResponse($response);
 }
 
 function remTrackQueue($sock,$songpos) {
-$datapath = findPLposPath($songpos,$sock);
-sendMpdCommand($sock,"delete ".$songpos);
-$response = readMpdResponse($sock);
-return $datapath;
+	$datapath = findPLposPath($songpos,$sock);
+	sendMpdCommand($sock,"delete ".$songpos);
+	$response = readMpdResponse($sock);
+	return $datapath;
 }
 
 function addQueue($sock,$path,$addplay = null,$pos = null) {
@@ -223,175 +228,182 @@ class globalRandom extends Thread {
 }
 
 function randomSelect($sock) {
-$songs = searchDB($sock,'globalrandom');
-srand((float) microtime() * 10000000);
-$randkey = array_rand($songs);
-return $songs[$randkey]['file'];
+	$songs = searchDB($sock,'globalrandom');
+	srand((float) microtime() * 10000000);
+	$randkey = array_rand($songs);
+	return $songs[$randkey]['file'];
 }
 
 function MpdStatus($sock) {
-// usleep(2000);
-sendMpdCommand($sock,"status");
-$status= readMpdResponse($sock);
-return $status;
+	// usleep(2000);
+	sendMpdCommand($sock,"status");
+	$status= readMpdResponse($sock);
+	return $status;
 }
 
 // create JS like Timestamp
 function jsTimestamp() {
-$timestamp = round(microtime(true) * 1000);
-return $timestamp;
+	$timestamp = round(microtime(true) * 1000);
+	return $timestamp;
 }
 
 function songTime($sec) {
-$minutes = sprintf('%02d', floor($sec / 60));
-$seconds = sprintf(':%02d', (int) $sec % 60);
-return $minutes.$seconds;
+	$minutes = sprintf('%02d', floor($sec / 60));
+	$seconds = sprintf(':%02d', (int) $sec % 60);
+	return $minutes.$seconds;
 }
 
 function phpVer() {
-$version = phpversion();
-// return substr($version, 0, 3); 
-return $version;
+	$version = phpversion();
+	// return substr($version, 0, 3); 
+	return $version;
 }
 
 function sysCmd($syscmd) {
-exec($syscmd." 2>&1", $output);
-runelog('sysCmd($str)',$syscmd);
-runelog('sysCmd() output:',$output);
-return $output;
+	exec($syscmd." 2>&1", $output);
+	runelog('sysCmd($str)',$syscmd);
+	runelog('sysCmd() output:',$output);
+	return $output;
 }
 
 function sysCmdAsync($syscmd) {
-exec($syscmd." > /dev/null 2>&1 &", $output);
-// runelog('sysCmdAsync($str)',$syscmd);
-// runelog('sysCmdAsync() output:',$output);
-return $output;
+	exec($syscmd." > /dev/null 2>&1 &", $output);
+	// runelog('sysCmdAsync($str)',$syscmd);
+	// runelog('sysCmdAsync() output:',$output);
+	return $output;
 }
 
 function getMpdDaemonDetalis() {
-$cmd = sysCmd('id -u mpd');
-$details['uid'] = $cmd[0];
-$cmd = sysCmd('id -g mpd');
-$details['gid'] = $cmd[0];
-$cmd = sysCmd('pgrep -u mpd');
-$details['pid'] = $cmd[0];
-return $details;
+	$cmd = sysCmd('id -u mpd');
+	$details['uid'] = $cmd[0];
+	$cmd = sysCmd('id -g mpd');
+	$details['gid'] = $cmd[0];
+	$cmd = sysCmd('pgrep -u mpd');
+	$details['pid'] = $cmd[0];
+	return $details;
 }
 
 // format Output for "playlist"
 function _parseFileListResponse($resp) {
-		if ( is_null($resp) ) {
-			return NULL;
-		} else {
-			$plistArray = array();
-			$plistLine = strtok($resp,"\n");
-			// $plistFile = "";
-			$plCounter = -1;
-			while ( $plistLine ) {
-				// TODO: testing!!! (synology @eaDir garbage filtering)
-				// list ( $element, $value ) = explode(": ",$plistLine);
-				if (!strpos($plistLine,'@eaDir')) list ( $element, $value ) = explode(': ',$plistLine);
-				if ( $element === 'file' OR $element === 'playlist') {
-					$plCounter++;
-					// $plistFile = $value;
-					$plistArray[$plCounter][$element] = $value;
-					$plistArray[$plCounter]['fileext'] = parseFileStr($value,'.');
-				} else if ( $element === 'directory' ) {
-					$plCounter++;
-					// record directory index for further processing
-					$dirCounter++;
-					// $plistFile = $value;
-					$plistArray[$plCounter]['directory'] = $value;
-				} else {
-					$plistArray[$plCounter][$element] = $value;
-					$plistArray[$plCounter]['Time2'] = songTime($plistArray[$plCounter]['Time']);
-				}
-
-				$plistLine = strtok("\n");
-			} 
-
-		}
-		return $plistArray;
+	if ( is_null($resp) ) {
+		return NULL;
+	} else {
+		$plistArray = array();
+		$plistLine = strtok($resp,"\n");
+		// $plistFile = "";
+		$plCounter = -1;
+		while ( $plistLine ) {
+			// TODO: testing!!! (synology @eaDir garbage filtering)
+			// list ( $element, $value ) = explode(": ",$plistLine);
+			if (!strpos($plistLine,'@eaDir')) list ( $element, $value ) = explode(': ',$plistLine);
+			if ( $element === 'file' OR $element === 'playlist') {
+				$plCounter++;
+				// $plistFile = $value;
+				$plistArray[$plCounter][$element] = $value;
+				$plistArray[$plCounter]['fileext'] = parseFileStr($value,'.');
+			} else if ( $element === 'directory' ) {
+				$plCounter++;
+				// record directory index for further processing
+				// $dirCounter++;
+				// $plistFile = $value;
+				$plistArray[$plCounter]['directory'] = $value;
+			} else if ( $element === 'Album' ) {
+				$plCounter++;
+				$plistArray[$plCounter]['album'] = $value;
+			} else if ( $element === 'Artist' ) {
+				$plCounter++;
+				$plistArray[$plCounter]['artist'] = $value;
+			} else if ( $element === 'Genre' ) {
+				$plCounter++;
+				$plistArray[$plCounter]['genre'] = $value;
+			} else {
+				$plistArray[$plCounter][$element] = $value;
+				$plistArray[$plCounter]['Time2'] = songTime($plistArray[$plCounter]['Time']);
+			}
+			$plistLine = strtok("\n");
+		} 
+	}
+	return $plistArray;
 }
 
 // format Output for "status"
 function _parseStatusResponse($resp) {
-		if ( is_null($resp) ) {
-			return NULL;
-		} else {
-			$plistArray = array();
-			$plistLine = strtok($resp,"\n");
-			$plistFile = "";
-			$plCounter = -1;
-			while ( $plistLine ) {
-				list ( $element, $value ) = explode(": ",$plistLine);
-				$plistArray[$element] = $value;
-				$plistLine = strtok("\n");
-			} 
-			// "elapsed time song_percent" added to output array
-			 $time = explode(":", $plistArray['time']);
-			 if ($time[0] != 0) {
-			 $percent = round(($time[0]*100)/$time[1]);	
-			 } else {
-			 	$percent = 0;
-			 }
-			 $plistArray["song_percent"] = $percent;
-			 $plistArray["elapsed"] = $time[0];
-			 $plistArray["time"] = $time[1];
+	if ( is_null($resp) ) {
+		return NULL;
+	} else {
+		$plistArray = array();
+		$plistLine = strtok($resp,"\n");
+		$plistFile = "";
+		$plCounter = -1;
+		while ( $plistLine ) {
+			list ( $element, $value ) = explode(": ",$plistLine);
+			$plistArray[$element] = $value;
+			$plistLine = strtok("\n");
+		} 
+		// "elapsed time song_percent" added to output array
+		 $time = explode(":", $plistArray['time']);
+		 if ($time[0] != 0) {
+		 $percent = round(($time[0]*100)/$time[1]);	
+		 } else {
+			$percent = 0;
+		 }
+		 $plistArray["song_percent"] = $percent;
+		 $plistArray["elapsed"] = $time[0];
+		 $plistArray["time"] = $time[1];
 
-			 // "audio format" output
-			 	$audio_format = explode(":", $plistArray['audio']);
-				switch ($audio_format[0]) {
-					case '48000':
-					case '96000':
-					case '192000':
-					$plistArray['audio_sample_rate'] = rtrim(rtrim(number_format($audio_format[0]),0),',');
-					break;
-					
-					case '44100':
-					case '88200':
-					case '176400':
-					case '352800':
-					$plistArray['audio_sample_rate'] = rtrim(number_format($audio_format[0],0,',','.'),0);
-					break;
-				}
-			 // format "audio_sample_depth" string
-			 	$plistArray['audio_sample_depth'] = $audio_format[1];
-			 // format "audio_channels" string
-			 	if ($audio_format[2] === "2") $plistArray['audio_channels'] = "Stereo";
-			 	if ($audio_format[2] === "1") $plistArray['audio_channels'] = "Mono";
-			 	// if ($audio_format[2] > 2) $plistArray['audio_channels'] = "Multichannel";
+		 // "audio format" output
+			$audio_format = explode(":", $plistArray['audio']);
+			switch ($audio_format[0]) {
+				case '48000':
+				case '96000':
+				case '192000':
+				$plistArray['audio_sample_rate'] = rtrim(rtrim(number_format($audio_format[0]),0),',');
+				break;
+				
+				case '44100':
+				case '88200':
+				case '176400':
+				case '352800':
+				$plistArray['audio_sample_rate'] = rtrim(number_format($audio_format[0],0,',','.'),0);
+				break;
+			}
+		 // format "audio_sample_depth" string
+			$plistArray['audio_sample_depth'] = $audio_format[1];
+		 // format "audio_channels" string
+			if ($audio_format[2] === "2") $plistArray['audio_channels'] = "Stereo";
+			if ($audio_format[2] === "1") $plistArray['audio_channels'] = "Mono";
+			// if ($audio_format[2] > 2) $plistArray['audio_channels'] = "Multichannel";
 
-		}
-		return $plistArray;
 	}
+	return $plistArray;
+}
 
 function _parseOutputsResponse($input,$active) {
-		if ( is_null($input) ) {
-				return NULL;
-		} else {
-			$response = preg_split("/\r?\n/", $input);
-			$outputs = array();
-			$linenum = 0;
-			$i = -1;
-			foreach($response as $line) {
-				if ($linenum % 3 == 0) {
-				$i++;
-				} 
-			if (!empty($line)) {
-			$value = explode(':',$line);
-			$outputs[$i][$value[0]] = trim($value[1]);
-				if (isset($active)) {
-					if ($value[0] == 'outputenabled' && $outputs[$i][$value[0]] == 1) {
-					$active = $i;
-					}
+	if ( is_null($input) ) {
+			return NULL;
+	} else {
+		$response = preg_split("/\r?\n/", $input);
+		$outputs = array();
+		$linenum = 0;
+		$i = -1;
+		foreach($response as $line) {
+			if ($linenum % 3 == 0) {
+			$i++;
+			} 
+		if (!empty($line)) {
+		$value = explode(':',$line);
+		$outputs[$i][$value[0]] = trim($value[1]);
+			if (isset($active)) {
+				if ($value[0] == 'outputenabled' && $outputs[$i][$value[0]] == 1) {
+				$active = $i;
 				}
-			} else {
-			unset($outputs[$i]);
 			}
-			$linenum++;
-			}
+		} else {
+		unset($outputs[$i]);
 		}
+		$linenum++;
+		}
+	}
 	if (isset($active)) {
 		return $active;
 	} else {
@@ -401,25 +413,25 @@ function _parseOutputsResponse($input,$active) {
 	
 // get file extension
 function parseFileStr($strFile,$delimiter,$negative = null) {
-// runelog("parseFileStr($strFile,$delimiter)");
-$pos = strrpos($strFile, $delimiter);
-// runelog('parseFileStr (position of delimiter)',$pos); 
-if (isset($negative)) {
-$str = substr($strFile, 0, -4);
-} else {
-$str = substr($strFile, $pos+1);
-}
-// runelog('parseFileStr (string)',$str); 
-return $str;
+	// runelog("parseFileStr($strFile,$delimiter)");
+	$pos = strrpos($strFile, $delimiter);
+	// runelog('parseFileStr (position of delimiter)',$pos); 
+	if (isset($negative)) {
+	$str = substr($strFile, 0, -4);
+	} else {
+	$str = substr($strFile, $pos+1);
+	}
+	// runelog('parseFileStr (string)',$str); 
+	return $str;
 }
 
 function OpCacheCtl($basepath,$action){
-if ($action === 'prime') $cmd = 'opcache_compile_file';
-if ($action === 'reset') $cmd = 'opcache_invalidate';
+	if ($action === 'prime') $cmd = 'opcache_compile_file';
+	if ($action === 'reset') $cmd = 'opcache_invalidate';
 	if (is_file($basepath)) {
 		if (parseFileStr($basepath,'.') === 'php' && $basepath != '/srv/http/command/cachectl.php' ) $cmd ($basepath);
 	}
-	elseif(is_dir($basepath)) {
+	elseif (is_dir($basepath)) {
 		$scan = glob(rtrim($basepath,'/').'/*');
 		foreach($scan as $index=>$path) {
 			OpCacheCtl($path,$action);
@@ -475,83 +487,83 @@ function netMounts($redis, $action ,$data = null) {
 				}
 		break;
 	}
-return $mp;
+	return $mp;
 }
 
 // Ramplay functions
 function rp_checkPLid($id,$mpd) {
-$_SESSION['DEBUG'] .= "rp_checkPLid:$id |";
-sendMpdCommand($mpd,'playlistid '.$id);
-$response = readMpdResponse($mpd);
-echo "<br>debug__".$response;
-echo "<br>debug__".stripos($response,'MPD error');
+	$_SESSION['DEBUG'] .= "rp_checkPLid:$id |";
+	sendMpdCommand($mpd,'playlistid '.$id);
+	$response = readMpdResponse($mpd);
+	echo "<br>debug__".$response;
+	echo "<br>debug__".stripos($response,'MPD error');
 	if (stripos($response,'OK')) {
-	return true;
+		return true;
 	} else {
-	return false;
+		return false;
 	}
 }
 
 //<< TODO: join with findPLposPath
 function rp_findPath($id,$mpd) {
-//$_SESSION['DEBUG'] .= "rp_findPath:$id |";
-sendMpdCommand($mpd,'playlistid '.$id);
-$idinfo = _parseFileListResponse(readMpdResponse($mpd));
-$path = $idinfo[0]['file'];
-//$_SESSION['DEBUG'] .= "Path:$path |";
-return $path;
+	//$_SESSION['DEBUG'] .= "rp_findPath:$id |";
+	sendMpdCommand($mpd,'playlistid '.$id);
+	$idinfo = _parseFileListResponse(readMpdResponse($mpd));
+	$path = $idinfo[0]['file'];
+	//$_SESSION['DEBUG'] .= "Path:$path |";
+	return $path;
 }
 
 //<< TODO: join with rp_findPath()
 function findPLposPath($songpos,$mpd) {
-//$_SESSION['DEBUG'] .= "rp_findPath:$id |";
-sendMpdCommand($mpd,'playlistinfo '.$songpos);
-$idinfo = _parseFileListResponse(readMpdResponse($mpd));
-$path = $idinfo[0]['file'];
-//$_SESSION['DEBUG'] .= "Path:$path |";
-return $path;
+	//$_SESSION['DEBUG'] .= "rp_findPath:$id |";
+	sendMpdCommand($mpd,'playlistinfo '.$songpos);
+	$idinfo = _parseFileListResponse(readMpdResponse($mpd));
+	$path = $idinfo[0]['file'];
+	//$_SESSION['DEBUG'] .= "Path:$path |";
+	return $path;
 }
 
 function rp_deleteFile($id,$mpd) {
-$_SESSION['DEBUG'] .= "rp_deleteFile:$id |";
+	$_SESSION['DEBUG'] .= "rp_deleteFile:$id |";
 	if (unlink(rp_findPath($id,$mpd))) {
-	return true;
+		return true;
 	} else {
-	return false;
+		return false;
 	}
 }
 
 function rp_copyFile($id,$mpd) {
-$_SESSION['DEBUG'] .= "rp_copyFile: $id|";
-$path = rp_findPath($id,$mpd);
-$song = parseFileStr($path,"/");
-$realpath = "/mnt/".$path;
-$ramplaypath = "/dev/shm/".$song;
-$_SESSION['DEBUG'] .= "rp_copyFilePATH: $path $ramplaypath|";
+	$_SESSION['DEBUG'] .= "rp_copyFile: $id|";
+	$path = rp_findPath($id,$mpd);
+	$song = parseFileStr($path,"/");
+	$realpath = "/mnt/".$path;
+	$ramplaypath = "/dev/shm/".$song;
+	$_SESSION['DEBUG'] .= "rp_copyFilePATH: $path $ramplaypath|";
 	if (copy($realpath, $ramplaypath)) {
-	$_SESSION['DEBUG'] .= "rp_addPlay:$id $song $path $pos|";
-	return $path;
+		$_SESSION['DEBUG'] .= "rp_addPlay:$id $song $path $pos|";
+		return $path;
 	} else {
-	return false;
+		return false;
 	}
 }
 
 function rp_updateFolder($mpd) {
-$_SESSION['DEBUG'] .= "rp_updateFolder: |";
-sendMpdCommand($mpd,"update ramplay");
+	$_SESSION['DEBUG'] .= "rp_updateFolder: |";
+	sendMpdCommand($mpd,"update ramplay");
 }
 
 function rp_addPlay($path,$mpd,$pos) {
-$song = parseFileStr($path,"/");
-$ramplaypath = "ramplay/".$song;
-$_SESSION['DEBUG'] .= "rp_addPlay:$id $song $path $pos|";
-addQueue($mpd,$ramplaypath);
-sendMpdCommand($mpd,'play '.$pos);
+	$song = parseFileStr($path,"/");
+	$ramplaypath = "ramplay/".$song;
+	$_SESSION['DEBUG'] .= "rp_addPlay:$id $song $path $pos|";
+	addQueue($mpd,$ramplaypath);
+	sendMpdCommand($mpd,'play '.$pos);
 }
 
 function rp_clean() {
-$_SESSION['DEBUG'] .= "rp_clean: |";
-recursiveDelete('/dev/shm/');
+	$_SESSION['DEBUG'] .= "rp_clean: |";
+	recursiveDelete('/dev/shm/');
 }
 
 function recursiveDelete($str){
@@ -617,22 +629,22 @@ return true;
 
 
 function runelog($title,$data = null) {
-// Connect to Redis backend
-$store = new Redis();
-$store->connect('127.0.0.1', 6379);
-$debug_level = $store->get('debug');
-	if ($debug_level !== '0') {
-	    if(is_array($data) OR is_object($data)) {
-			if (is_array($data)) error_log('[debug='.$debug_level.'] ### '.$title.' ### $data type = array',0);
-			if (is_object($data)) error_log('[debug='.$debug_level.'] ### '.$title.' ### $data type = object',0);
-			foreach($data as $key => $value) {
-			error_log('[debug='.$debug_level.'] ### '.$title.' ###  [\''.$key.'\'] => '.$value,0);
+	// Connect to Redis backend
+	$store = new Redis();
+	$store->connect('127.0.0.1', 6379);
+	$debug_level = $store->get('debug');
+		if ($debug_level !== '0') {
+			if(is_array($data) OR is_object($data)) {
+				if (is_array($data)) error_log('[debug='.$debug_level.'] ### '.$title.' ### $data type = array',0);
+				if (is_object($data)) error_log('[debug='.$debug_level.'] ### '.$title.' ### $data type = object',0);
+				foreach($data as $key => $value) {
+				error_log('[debug='.$debug_level.'] ### '.$title.' ###  [\''.$key.'\'] => '.$value,0);
+				}
+			} else {
+				error_log('[debug='.$debug_level.'] ### '.$title.' ###  '.$data,0);
 			}
-	    } else {
-			error_log('[debug='.$debug_level.'] ### '.$title.' ###  '.$data,0);
-	    }
-	}
-$store->close();
+		}
+	$store->close();
 }
 
 function waitSyWrk($redis,$jobID) {
@@ -664,9 +676,9 @@ function wrk_control($redis,$action,$data) {
 			runelog('wrk_control data:', $redis->hGet('w_queue', $jobID));
 		break;	
 	}
-// debug
-runelog('[wrk] wrk_control($redis,'.$action.','.$data.') jobID=', $jobID);
-return $jobID;
+	// debug
+	runelog('[wrk] wrk_control($redis,'.$action.','.$data.') jobID=', $jobID);
+	return $jobID;
 }
 
 // search a string in a file and replace with another string the whole line.
@@ -713,15 +725,15 @@ function wrk_replaceTextLine($file,$inputArray,$strfind,$strrepl,$linelabel,$lin
 // make device TOTALBACKUP (with switch DEV copy all /etc)
 function wrk_backup($bktype) {
 	if ($bktype == 'dev') {
-	$filepath = "/run/totalbackup_".date('Y-m-d').".tar.gz";
-	$cmdstring = "tar -czf ".$filepath." /var/lib/mpd /boot/cmdline.txt /var/www /etc";
+		$filepath = "/run/totalbackup_".date('Y-m-d').".tar.gz";
+		$cmdstring = "tar -czf ".$filepath." /var/lib/mpd /boot/cmdline.txt /var/www /etc";
 	} else {
-	$filepath = "/run/backup_".date('Y-m-d').".tar.gz";
-	$cmdstring = "tar -czf ".$filepath." /var/lib/mpd /etc/mpd.conf /var/www/db/player.db";
+		$filepath = "/run/backup_".date('Y-m-d').".tar.gz";
+		$cmdstring = "tar -czf ".$filepath." /var/lib/mpd /etc/mpd.conf /var/www/db/player.db";
 	}
 	
-sysCmd($cmdstring);
-return $filepath;
+	sysCmd($cmdstring);
+	return $filepath;
 }
 
 
@@ -1080,29 +1092,29 @@ runelog('----- wrk_wpa_cli() action:',$action);
 		break;
 		
 	}
-// debug
-runelog('----- wrk_wpa_cli() exit status',$return);
-runelog('**** wrk_wpa_cli() STOP ****');
-return $return;
+	// debug
+	runelog('----- wrk_wpa_cli() exit status',$return);
+	runelog('**** wrk_wpa_cli() STOP ****');
+	return $return;
 }
 
 function wrk_restore($backupfile) {
-$path = "/run/".$backupfile;
-$cmdstring = "tar xzf ".$path." --overwrite --directory /";
+	$path = "/run/".$backupfile;
+	$cmdstring = "tar xzf ".$path." --overwrite --directory /";
 	if (sysCmd($cmdstring)) {
 		recursiveDelete($path);
 	}
 }
 
 function wrk_jobID() {
-$jobID = md5(uniqid(rand(), true));
-return $jobID;
+	$jobID = md5(uniqid(rand(), true));
+	return $jobID;
 }
 
 function wrk_checkStrSysfile($sysfile,$searchstr) {
-$file = stripcslashes(file_get_contents($sysfile));
-// debug
-runelog('wrk_checkStrSysfile('.$sysfile.','.$searchstr.')',$searchstr);
+	$file = stripcslashes(file_get_contents($sysfile));
+	// debug
+	runelog('wrk_checkStrSysfile('.$sysfile.','.$searchstr.')',$searchstr);
 	if (strpos($file, $searchstr)) {
 		return true;
 	} else {
@@ -1120,43 +1132,43 @@ function wrk_checkMount($mpname) {
 }
 
 function wrk_cleanDistro($redis) {
-runelog('function CLEAN DISTRO invoked!!!','');
-// remove mpd.db
-sysCmd('systemctl stop mpd');
-redisDatastore($redis,'reset');
-sleep(1);
-sysCmd('rm /var/lib/mpd/mpd.db');
-sysCmd('rm /var/lib/mpd/mpdstate');
-// reset /var/log/*
-sysCmd('rm -f /var/log/*');
-// reset /var/log/nginx/*
-sysCmd('rm -f /var/log/nginx/*');
-// reset /var/log/atop/*
-sysCmd('rm -f /var/log/atop/*');
-// reset /var/log/old/*
-sysCmd('rm -f /var/log/old/*');
-// reset /var/log/samba/*
-sysCmd('rm -rf /var/log/samba/*');
-// reset /root/ logs
-sysCmd('rm -rf /root/.*');
-// delete .git folder
-sysCmd('rm -rf /var/www/.git');
-// switch smb.conf to 'production' state
-sysCmd('rm /var/www/_OS_SETTINGS/etc/samba/smb.conf');
-sysCmd('ln -s /var/www/_OS_SETTINGS/etc/samba/smb-prod.conf /var/www/_OS_SETTINGS/etc/samba/smb.conf');
-// switch nginx.conf to 'production' state
-sysCmd('systemctl stop nginx');
-sysCmd('rm /etc/nginx/nginx.conf');
-sysCmd('ln -s /var/www/_OS_SETTINGS/etc/nginx/nginx-prod.conf /etc/nginx/nginx.conf');
-sysCmd('systemctl start nginx');
-// reset /var/log/runeaudio/*
-sysCmd('rm -f /var/log/runeaudio/*');
-// rest mpd.conf
-wrk_mpdconf($redis,'reset');
-// restore default player.db
-sysCmd('cp /var/www/db/player.db.default /var/www/db/player.db');
-sysCmd('chmod 777 /var/www/db/player.db');
-sysCmd('poweroff');
+	runelog('function CLEAN DISTRO invoked!!!','');
+	// remove mpd.db
+	sysCmd('systemctl stop mpd');
+	redisDatastore($redis,'reset');
+	sleep(1);
+	sysCmd('rm /var/lib/mpd/mpd.db');
+	sysCmd('rm /var/lib/mpd/mpdstate');
+	// reset /var/log/*
+	sysCmd('rm -f /var/log/*');
+	// reset /var/log/nginx/*
+	sysCmd('rm -f /var/log/nginx/*');
+	// reset /var/log/atop/*
+	sysCmd('rm -f /var/log/atop/*');
+	// reset /var/log/old/*
+	sysCmd('rm -f /var/log/old/*');
+	// reset /var/log/samba/*
+	sysCmd('rm -rf /var/log/samba/*');
+	// reset /root/ logs
+	sysCmd('rm -rf /root/.*');
+	// delete .git folder
+	sysCmd('rm -rf /var/www/.git');
+	// switch smb.conf to 'production' state
+	sysCmd('rm /var/www/_OS_SETTINGS/etc/samba/smb.conf');
+	sysCmd('ln -s /var/www/_OS_SETTINGS/etc/samba/smb-prod.conf /var/www/_OS_SETTINGS/etc/samba/smb.conf');
+	// switch nginx.conf to 'production' state
+	sysCmd('systemctl stop nginx');
+	sysCmd('rm /etc/nginx/nginx.conf');
+	sysCmd('ln -s /var/www/_OS_SETTINGS/etc/nginx/nginx-prod.conf /etc/nginx/nginx.conf');
+	sysCmd('systemctl start nginx');
+	// reset /var/log/runeaudio/*
+	sysCmd('rm -f /var/log/runeaudio/*');
+	// rest mpd.conf
+	wrk_mpdconf($redis,'reset');
+	// restore default player.db
+	sysCmd('cp /var/www/db/player.db.default /var/www/db/player.db');
+	sysCmd('chmod 777 /var/www/db/player.db');
+	sysCmd('poweroff');
 }
 
 function wrk_audioOutput($redis,$action,$args = null) {
@@ -1326,8 +1338,8 @@ if (wrk_mpdPlaybackStatus() === 'playing') {
 			sysCmd('modprobe snd_soc_hifiberry_dac');
 		break;
 	}
-$redis->set('i2smodule',$args);
-wrk_mpdconf($redis,'refresh');
+	$redis->set('i2smodule',$args);
+	wrk_mpdconf($redis,'refresh');
 }
 
 function wrk_kernelswitch($redis,$args) {
@@ -1366,17 +1378,17 @@ function wrk_kernelswitch($redis,$args) {
 		$redis->set('kernel', $args);
 		$redis->save();
 	}
-return $return;
+	return $return;
 }
 
 function wrk_mpdconf($redis, $action, $args = null, $jobID = null) {
-// set mpd.conf file header
-$header = "###################################\n";
-$header .= "# Auto generated mpd.conf file\n";
-$header .= "# please DO NOT edit it manually!\n";
-$header .= "# Use RuneUI MPD config section\n";
-$header .= "###################################\n";
-$header .= "\n";
+	// set mpd.conf file header
+	$header = "###################################\n";
+	$header .= "# Auto generated mpd.conf file\n";
+	$header .= "# please DO NOT edit it manually!\n";
+	$header .= "# Use RuneUI MPD config section\n";
+	$header .= "###################################\n";
+	$header .= "\n";
 	switch ($action) {
 		case 'reset':
 			// default MPD config
@@ -1648,7 +1660,7 @@ function wrk_mpdPlaybackStatus() {
 	$status = sysCmd("mpc status | grep '\[' | cut -d '[' -f 2 | cut -d ']' -f 1");
 	// debug
 	runelog('wrk_mpdPlaybackStatus (current state):',$status[0]);
-return $status[0];
+	return $status[0];
 }
 
 function wrk_shairport($redis,$ao,$name = null) {
@@ -1725,7 +1737,7 @@ function wrk_sourcemount($redis,$action,$id) {
 		break;
 		
 	}
-return $return;
+	return $return;
 }
 
 function wrk_sourcecfg($redis,$action,$args) {
@@ -1790,7 +1802,7 @@ runelog('function wrk_sourcecfg('.$action.')',$args);
 		
 	}
 
-return $return;
+	return $return;
 }
 
 function wrk_getHwPlatform() {
@@ -1834,19 +1846,19 @@ $file = '/proc/cpuinfo';
 				}
 		}
 	}
-if (!isset($arch)) {
-$arch = '--';
-}
-return $arch;
+	if (!isset($arch)) {
+		$arch = '--';
+	}
+	return $arch;
 }
 
 function wrk_setHwPlatform($redis) {
-$arch = wrk_getHwPlatform();
-runelog('arch= ',$arch);
-$playerid = wrk_playerID($arch);
-$redis->set('playerid', $playerid);
-runelog('playerid= ',$playerid);
-// register platform into database
+	$arch = wrk_getHwPlatform();
+	runelog('arch= ',$arch);
+	$playerid = wrk_playerID($arch);
+	$redis->set('playerid', $playerid);
+	runelog('playerid= ',$playerid);
+	// register platform into database
 	switch($arch) {
 		case '01':
 		$redis->set('hwplatform','RaspberryPi');
@@ -1880,17 +1892,17 @@ runelog('playerid= ',$playerid);
 }
 
 function wrk_playerID($arch) {
-// $playerid = $arch.md5(uniqid(rand(), true)).md5(uniqid(rand(), true));
-$playerid = $arch.md5_file('/sys/class/net/eth0/address');
-return $playerid;
+	// $playerid = $arch.md5(uniqid(rand(), true)).md5(uniqid(rand(), true));
+	$playerid = $arch.md5_file('/sys/class/net/eth0/address');
+	return $playerid;
 }
 
 function wrk_sysAcl() {
-sysCmd('chmod -R a+x /var/www/command');
-sysCmd('chmod 777 /run');
-sysCmd('chmod a+rw /etc/mpd.conf');
-sysCmd('chmod a+rw /etc/mpdscribble.conf');
-sysCmd('chown -R mpd.audio /var/lib/mpd');
+	sysCmd('chmod -R a+x /var/www/command');
+	sysCmd('chmod 777 /run');
+	sysCmd('chmod a+rw /etc/mpd.conf');
+	sysCmd('chmod a+rw /etc/mpdscribble.conf');
+	sysCmd('chown -R mpd.audio /var/lib/mpd');
 }
 
 function wrk_sysEnvCheck($arch,$install) {
@@ -2000,8 +2012,8 @@ function wrk_sysEnvCheck($arch,$install) {
 }
 
 function wrk_NTPsync($ntpserver) {
-//debug
-runelog('NTP SERVER',$ntpserver);
+	//debug
+	runelog('NTP SERVER',$ntpserver);
 	// if (sysCmd('ntpdate '.$ntpserver)) {
 	if (sysCmdAsync('ntpdate '.$ntpserver)) {
 		return $ntpserver;

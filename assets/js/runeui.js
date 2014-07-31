@@ -946,9 +946,9 @@ function populateDB(options){
 // launch the right AJAX call for Library rendering
 function getDB(options){
 	// DEFAULTS
-	var cmd = options.cmd || 'filepath',
+	var cmd = options.cmd || 'browse',
 		path = options.path || '',
-		browsemode = options.browsemode || '',
+		browsemode = GUI.browsemode,
 		uplevel = options.uplevel || '',
 		plugin = options.plugin || '',
 		querytype = options.querytype || '',
@@ -998,8 +998,8 @@ function getDB(options){
 					keyword: keyword
 				});
 			}, 'json');
-		} else if (cmd === 'filepath') {
-			$.post('/db/?cmd=filepath', { 'path': path }, function(data) {
+		} else if (cmd === 'browse') {
+			$.post('/db/?cmd=browse', { 'path': path, 'browsemode': browsemode }, function(data) {
 				populateDB({
 					data: data,
 					path: path,
@@ -1666,7 +1666,6 @@ if ($('#section-index').length) {
 				++GUI.currentDBpos[10];
 				getDB({
 					path: $(this).data('path'),
-					browsemode: GUI.browsemode,
 					uplevel: 0,
 					plugin: $(this).data('plugin')
 				});
@@ -1709,7 +1708,6 @@ if ($('#section-index').length) {
 						var args = el.data('path');
 						getDB({
 							path: path,
-							browsemode: GUI.browsemode,
 							plugin: 'Dirble',
 							querytype: querytype,
 							args : args
@@ -1722,7 +1720,6 @@ if ($('#section-index').length) {
 						// var args = el.data('path');
 						// getDB({
 							// path: path,
-							// browsemode: GUI.browsemode,
 							// plugin: 'Jamendo',
 							// querytype: querytype,
 							// args : args
@@ -1733,7 +1730,6 @@ if ($('#section-index').length) {
 						//GUI.currentDBpos[GUI.currentDBpos[10]] = $('.database .db-entry').index(this);
 						getDB({
 							path: path,
-							browsemode: GUI.browsemode,
 							uplevel: 0
 						});
 					}
@@ -1775,7 +1771,6 @@ if ($('#section-index').length) {
 			}
 			getDB({
 				path: path,
-				browsemode: GUI.browsemode,
 				plugin: GUI.plugin,
 				uplevel: 1
 			});
@@ -1931,8 +1926,7 @@ if ($('#section-index').length) {
 			GUI.browsemode = browsemode.slice(0,-1);
 			$('#browse-mode-current').html(GUI.browsemode);
 			getDB({
-				path: '',
-				browsemode: GUI.browsemode
+				path: ''
 			});
 			// console.log('Browse mode set to: ', GUI.browsemode);
 		});
