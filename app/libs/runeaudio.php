@@ -292,31 +292,36 @@ function _parseFileListResponse($resp) {
 		$plistLine = strtok($resp,"\n");
 		// $plistFile = "";
 		$plCounter = -1;
+		$browseMode = TRUE;
 		while ( $plistLine ) {
 			// TODO: testing!!! (synology @eaDir garbage filtering)
 			// list ( $element, $value ) = explode(": ",$plistLine);
 			if (!strpos($plistLine,'@eaDir')) list ( $element, $value ) = explode(': ',$plistLine);
-			if ( $element === 'file' OR $element === 'playlist') {
+			if ($element === 'file' OR $element === 'playlist') {
 				$plCounter++;
+				$browseMode = FALSE;
 				// $plistFile = $value;
 				$plistArray[$plCounter][$element] = $value;
 				$plistArray[$plCounter]['fileext'] = parseFileStr($value,'.');
-			} else if ( $element === 'directory' ) {
+			} else if ($element === 'directory') {
 				$plCounter++;
 				// record directory index for further processing
 				// $dirCounter++;
 				// $plistFile = $value;
 				$plistArray[$plCounter]['directory'] = $value;
-			} else if ( $element === 'Album' ) {
-				$plCounter++;
-				$plistArray[$plCounter]['album'] = $value;
-			} else if ( $element === 'Artist' ) {
-				$plCounter++;
-				$plistArray[$plCounter]['artist'] = $value;
-			} else if ( $element === 'Genre' ) {
-				$plCounter++;
-				$plistArray[$plCounter]['genre'] = $value;
 			} else {
+				if ($browseMode) {
+					if ($element === 'Album') {
+						$plCounter++;
+						$plistArray[$plCounter]['album'] = $value;
+					} else if ($element === 'Artist') {
+						$plCounter++;
+						$plistArray[$plCounter]['artist'] = $value;
+					} else if ($element === 'Genre') {
+						$plCounter++;
+						$plistArray[$plCounter]['genre'] = $value;
+					}
+				}
 				$plistArray[$plCounter][$element] = $value;
 				$plistArray[$plCounter]['Time2'] = songTime($plistArray[$plCounter]['Time']);
 			}
