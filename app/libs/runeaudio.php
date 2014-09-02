@@ -309,19 +309,18 @@ function _parseFileListResponse($resp) {
 				// $dirCounter++;
 				// $plistFile = $value;
 				$plistArray[$plCounter]['directory'] = $value;
-			} else {
-				if ($browseMode) {
-					if ($element === 'Album') {
-						$plCounter++;
-						$plistArray[$plCounter]['album'] = $value;
-					} else if ($element === 'Artist') {
-						$plCounter++;
-						$plistArray[$plCounter]['artist'] = $value;
-					} else if ($element === 'Genre') {
-						$plCounter++;
-						$plistArray[$plCounter]['genre'] = $value;
-					}
+			} else if ($browseMode) {
+				if ($element === 'Album') {
+					$plCounter++;
+					$plistArray[$plCounter]['album'] = $value;
+				} else if ($element === 'Artist') {
+					$plCounter++;
+					$plistArray[$plCounter]['artist'] = $value;
+				} else if ($element === 'Genre') {
+					$plCounter++;
+					$plistArray[$plCounter]['genre'] = $value;
 				}
+			} else {
 				$plistArray[$plCounter][$element] = $value;
 				$plistArray[$plCounter]['Time2'] = songTime($plistArray[$plCounter]['Time']);
 			}

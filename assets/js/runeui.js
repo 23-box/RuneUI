@@ -749,7 +749,7 @@ function parseResponse(options) {
 			if (inpath === '' && inputArr.file !== undefined) {
 				inpath = parsePath(inputArr.file);
 			}
-			if (inputArr.file !== undefined || inpath === 'Webradio') {
+			if (GUI.browsemode === 'file' && (inputArr.file !== undefined || inpath === 'Webradio')) {
 				// DEBUG
 				// console.log('inputArr.file: ', inputArr.file);
 				// console.log('inputArr.Title: ', inputArr.Title);
@@ -783,6 +783,27 @@ function parseResponse(options) {
 					}
 				}
 				content += '</span></li>';
+			} else if (GUI.browsemode === 'album' && inputArr.album !== undefined) {
+			// browse by Album
+				content = '<li id="db-' + (i + 1) + '" class="db-folder" data-path="';
+				content += inputArr.album;
+				content += '"><i class="fa fa-bars db-action" title="Actions" data-toggle="context" data-target="#context-menu-file"></i><span><i class="fa fa-folder-o db-icon-alt"></i>';
+				content += inputArr.album;
+				content += '</span></li>';
+			} else if (GUI.browsemode === 'artist' && inputArr.artist !== undefined) {
+			// browse by Artist
+				content = '<li id="db-' + (i + 1) + '" class="db-folder" data-path="';
+				content += inputArr.artist;
+				content += '"><i class="fa fa-bars db-action" title="Actions" data-toggle="context" data-target="#context-menu-file"></i><span><i class="fa fa-user db-icon-alt"></i>';
+				content += inputArr.artist;
+				content += '</span></li>';
+			} else if (GUI.browsemode === 'genre' && inputArr.genre !== undefined) {
+			// browse by Genre
+				content = '<li id="db-' + (i + 1) + '" class="db-folder" data-path="';
+				content += inputArr.genre;
+				content += '"><i class="fa fa-bars db-action" title="Actions" data-toggle="context" data-target="#context-menu-file"></i><span><i class="fa fa-dot-circle-o db-icon-alt"></i>';
+				content += inputArr.genre;
+				content += '</span></li>';
 			} else if (inputArr.playlist !== undefined) {
 			// nothing to display
 				content += '';
@@ -791,9 +812,9 @@ function parseResponse(options) {
 				content = '<li id="db-' + (i + 1) + '" class="db-folder" data-path="';
 				content += inputArr.directory;
 				if (inpath !== '') {
-					content += '"><i class="fa fa-bars db-action" title="Actions" data-toggle="context" data-target="#context-menu"></i><span><i class="fa fa-folder-open"></i>';
+					content += '"><i class="fa fa-bars db-action" title="Actions" data-toggle="context" data-target="#context-menu"></i><span><i class="fa fa-folder-open db-icon-alt"></i>';
 				} else {
-					content += '"><i class="fa fa-bars db-action" title="Actions" data-toggle="context" data-target="#context-menu-root"></i><i class="fa fa-hdd-o icon-root"></i><span>';
+					content += '"><i class="fa fa-bars db-action" title="Actions" data-toggle="context" data-target="#context-menu-root"></i><i class="fa fa-hdd-o db-icon-alt icon-root"></i><span>';
 				}
 				content += inputArr.directory.replace(inpath + '/', '');
 				content += '</span></li>';
@@ -806,7 +827,7 @@ function parseResponse(options) {
 			// folders
 				content = '<li id="db-' + (i + 1) + '" class="db-dirble db-folder" data-path="';
 				content += inputArr.id;
-				content += '"><span><i class="fa fa-folder-open"></i>';
+				content += '"><span><i class="fa fa-folder-open db-icon-alt"></i>';
 				content += inputArr.name;
 				content += '</span></li>';
 			} else if (querytype === 'stations') {
@@ -948,14 +969,13 @@ function getDB(options){
 	// DEFAULTS
 	var cmd = options.cmd || 'browse',
 		path = options.path || '',
-		browsemode = GUI.browsemode,
 		uplevel = options.uplevel || '',
 		plugin = options.plugin || '',
 		querytype = options.querytype || '',
 		args = options.args || '';
 		
 	// DEBUG
-	// console.log('OPTIONS: cmd = ' + cmd + ', path = ' + path + ', browsemode = ' + browsemode + ', uplevel = ' + uplevel + ', plugin = ' + plugin);
+	// console.log('OPTIONS: cmd = ' + cmd + ', path = ' + path + ', browsemode = ' + GUI.browsemode + ', uplevel = ' + uplevel + ', plugin = ' + plugin);
 	
 	loadingSpinner('db');
 	
@@ -990,7 +1010,7 @@ function getDB(options){
 	// normal browsing
 		if (cmd === 'search') {
 			var keyword = $('#db-search-keyword').val();
-			$.post('/db/?querytype=' + browsemode + '&cmd=search', { 'query': keyword }, function(data) {
+			$.post('/db/?querytype=' + GUI.browsemode + '&cmd=search', { 'query': keyword }, function(data) {
 				populateDB({
 					data: data,
 					path: path,
@@ -999,7 +1019,7 @@ function getDB(options){
 				});
 			}, 'json');
 		} else if (cmd === 'browse') {
-			$.post('/db/?cmd=browse', { 'path': path, 'browsemode': browsemode }, function(data) {
+			$.post('/db/?cmd=browse', { 'path': path, 'browsemode': GUI.browsemode }, function(data) {
 				populateDB({
 					data: data,
 					path: path,
